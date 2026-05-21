@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Energy System - Repair & History</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .form-control-custom, .form-select-custom {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #f8fafc;
+            border-radius: 8px;
+        }
+        .form-control-custom:focus, .form-select-custom:focus {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+            color: #f8fafc;
+        }
+        .form-select-custom option {
+            background-color: #0f172a;
+            color: #f8fafc;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark-custom">
+        <div class="container-fluid">
+            <a class="navbar-brand fw-bold" href="/">
+                <i class="fa-solid fa-bolt text-warning me-2"></i> Smart Energy Dashboard
+            </a>
+            
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <div class="collapse navbar-collapse justify-content-between" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/"><i class="fa-solid fa-chart-line me-1"></i> 即時監控</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/repair"><i class="fa-solid fa-tools me-1"></i> 設備報修與履歷</a>
+                    </li>
+                </ul>
+                
+                <div class="d-flex align-items-center">
+                    <span class="navbar-text text-light me-3">
+                        <i class="fa-regular fa-user text-muted me-1"></i> 
+                        <span class="text-white fw-semibold">{{ username }}</span> 
+                        <span class="badge bg-secondary text-dark fw-bold ms-1" style="font-size: 0.75rem; background-color: #e2e8f0 !important;">{{ '管理員' if role == 'admin' else '學生' }}</span>
+                    </span>
+                    <a href="/logout" class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-right-from-bracket"></i> 登出</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container-fluid mt-4">
+        <div class="row mb-4">
+            <div class="col-12">
+                <h2 class="fw-bold mb-0 text-white">設備維護與履歷系統</h2>
+                <p class="text-muted">線上提交故障申報，並追蹤設備維護履歷紀錄。</p>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Repair Form Card -->
+            <div class="col-xl-4 mb-4">
+                <div class="card shadow-sm border-0 glass-card">
+                    <div class="card-body">
+                        <h5 class="card-title fw-bold mb-4 text-white"><i class="fa-solid fa-paper-plane text-primary me-2"></i> 線上申報故障</h5>
+                        <form action="/api/repair" method="POST">
+                            <div class="mb-3">
+                                <label for="device_name" class="form-label text-muted small fw-semibold">異常設備</label>
+                                <select class="form-select form-select-custom text-white" id="device_name" name="device_name" required>
+                                    <option value="" disabled selected>請選擇故障設備...</option>
+                                    {% for device in devices %}
+                                    <option value="{{ device }}">{{ device }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="mb-4">
+                                <label for="description" class="form-label text-muted small fw-semibold">狀況描述</label>
+                                <textarea class="form-control form-control-custom" id="description" name="description" rows="4" placeholder="請詳細說明設備損壞或異常狀況..." required></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100 fw-semibold"><i class="fa-solid fa-check me-1"></i> 送出報修單</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active Tickets Kanban -->
+            <div class="col-xl-8 mb-4">
+                <div class="card shadow-sm border-0 glass-card">
+                    <div class="card-body">
+                        <h5 class="card-title fw-bold mb-4 text-white"><i class="fa-solid fa-spinner text-info me-2"></i> 即時維護看板</h5>
+                        
+                        {% if not active_tickets %}
+                        <div class="text-center py-5 text-muted">
+                            <i class="fa-solid fa-clipboard-check fa-3x mb-3 text-secondary"></i>
+                            <p class="mb-0">目前沒有進行中的報修單，所有設備運行正常。</p>
+                        </div>
+                        {% else %}
+                        <div class="row">
+                            {% for ticket in active_tickets %}
+                            <div class="col-md-6 mb-3">
+                                <div class="card bg-dark border-0 p-3 text-white h-100" style="background-color: rgba(15, 23, 42, 0.4) !important; border: 1px solid rgba(255, 255, 255, 0.05) !important;">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <h6 class="fw-bold mb-0">{{ ticket.device_name }}</h6>
+                                        {% if ticket.status == '待處理' %}
+                                        <span class="badge bg-warning text-dark"><i class="fa-solid fa-clock-rotate-left"></i> 待處理</span>
+                                        {% else %}
+                                        <span class="badge bg-info text-dark"><i class="fa-solid fa-wrench"></i> 維修中</span>
+                                        {% endif %}
+                                    </div>
+                                    <p class="card-text text-muted mb-3" style="font-size: 0.9rem;">{{ ticket.description }}</p>
+                                    
+                                    <hr class="my-2 border-secondary" style="opacity: 0.2;">
+                                    
+                                    <div class="d-flex justify-content-between align-items-center mb-3" style="font-size: 0.8rem;">
+                                        <span class="text-muted">通報者: {{ ticket.reported_by.split('@')[0] }}</span>
+                                        {% if ticket.handler %}
+                                        <span class="text-muted">接單人: {{ ticket.handler.split('@')[0] }}</span>
+                                        {% endif %}
+                                    </div>
+
+                                    <!-- Admin Operations -->
+                                    {% if role == 'admin' %}
+                                    <div class="mt-auto">
+                                        {% if ticket.status == '待處理' %}
+                                        <form action="/api/repair/{{ ticket.id }}/status" method="POST">
+                                            <input type="hidden" name="status" value="維修中">
+                                            <button type="submit" class="btn btn-sm btn-primary w-100"><i class="fa-solid fa-hammer"></i> 點我接單維修</button>
+                                        </form>
+                                        {% elif ticket.status == '維修中' %}
+                                        <form action="/api/repair/{{ ticket.id }}/status" method="POST">
+                                            <input type="hidden" name="status" value="已結案">
+                                            <button type="submit" class="btn btn-sm btn-success w-100"><i class="fa-solid fa-square-check"></i> 完成維修 (結案)</button>
+                                        </form>
+                                        {% endif %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- History Records Table -->
+        <div class="row">
+            <div class="col-12 mb-4">
+                <div class="card shadow-sm border-0 glass-card">
+                    <div class="card-body">
+                        <h5 class="card-title fw-bold mb-4 text-white"><i class="fa-solid fa-history text-success me-2"></i> 設備歷史維護履歷</h5>
+                        <div class="table-responsive">
+                            <table class="table table-hover table-dark table-borderless text-white mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>申報時間</th>
+                                        <th>設備名稱</th>
+                                        <th>故障狀況描述</th>
+                                        <th>維修負責人</th>
+                                        <th>結案時間</th>
+                                        <th class="text-center">狀態</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% if not resolved_tickets %}
+                                    <tr>
+                                        <td colspan="6" class="text-center py-4 text-muted">無歷史維護紀錄</td>
+                                    </tr>
+                                    {% else %}
+                                        {% for ticket in resolved_tickets %}
+                                        <tr>
+                                            <td><small class="text-muted">{{ ticket.created_at }}</small></td>
+                                            <td class="fw-semibold">{{ ticket.device_name }}</td>
+                                            <td>{{ ticket.description }}</td>
+                                            <td>{{ ticket.handler.split('@')[0] if ticket.handler else '-' }}</td>
+                                            <td><small class="text-success">{{ ticket.resolved_at }}</small></td>
+                                            <td class="text-center"><span class="badge bg-success bg-opacity-20 text-success"><i class="fa-solid fa-circle-check"></i> 已修復</span></td>
+                                        </tr>
+                                        {% endfor %}
+                                    {% endif %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

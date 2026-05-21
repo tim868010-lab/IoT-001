@@ -16,6 +16,13 @@ document.addEventListener('DOMContentLoaded', function() {
         'Device-C (HVAC)': { border: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' }
     };
 
+    // Define energy consumption thresholds (kW)
+    const deviceThresholds = {
+        'Device-A (Chiller)': 180.0,
+        'Device-B (Air Compressor)': 110.0,
+        'Device-C (HVAC)': 55.0
+    };
+
     let energyChart = new Chart(ctx, {
         type: 'line',
         data: {
@@ -42,7 +49,25 @@ document.addEventListener('DOMContentLoaded', function() {
                     bodyColor: '#e2e8f0',
                     borderColor: 'rgba(255,255,255,0.1)',
                     borderWidth: 1,
-                    padding: 12
+                    padding: 12,
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            if (context.parsed.y !== null) {
+                                label += context.parsed.y.toFixed(2) + ' kW';
+                            }
+                            
+                            // Add alert warning in tooltip
+                            const threshold = deviceThresholds[context.dataset.label];
+                            if (context.parsed.y > threshold) {
+                                label += ' ⚠️ (超標)';
+                            }
+                            return label;
+                        }
+                    }
                 }
             },
             scales: {
@@ -83,9 +108,16 @@ document.addEventListener('DOMContentLoaded', function() {
     async function fetchData() {
         try {
             // Add visual feedback to refresh button
-            refreshBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Refreshing...';
+            if (refreshBtn) {
+                refreshBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Refreshing...';
+            }
             
             const response = await fetch('/api/data?limit=100');
+            if (response.status === 401) {
+                // Redirect if session expired
+                window.location.href = '/login';
+                return;
+            }
             const data = await response.json();
             
             if (data.length > 0) {
@@ -94,13 +126,17 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             // Reset button
-            setTimeout(() => {
-                refreshBtn.innerHTML = '<i class="fa-solid fa-rotate-right"></i> Refresh';
-            }, 500);
+            if (refreshBtn) {
+                setTimeout(() => {
+                    refreshBtn.innerHTML = '<i class="fa-solid fa-rotate-right"></i> Refresh';
+                }, 500);
+            }
 
         } catch (error) {
             console.error('Error fetching data:', error);
-            refreshBtn.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-warning"></i> Error';
+            if (refreshBtn) {
+                refreshBtn.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-warning"></i> Error';
+            }
         }
     }
 
@@ -134,14 +170,40 @@ document.addEventListener('DOMContentLoaded', function() {
             const colors = deviceColors[deviceName] || fallbackColors[colorIndex % fallbackColors.length];
             colorIndex++;
             
+            const threshold = deviceThresholds[deviceName] || 999.0;
+            
             datasets.push({
                 label: deviceName,
                 data: dataPoints,
                 borderColor: colors.border,
                 backgroundColor: colors.bg,
                 borderWidth: 2,
-                pointRadius: 2,
-                pointHoverRadius: 5,
+                // Custom dot colors: highlight warnings in red
+                pointBackgroundColor: function(context) {
+                    const index = context.dataIndex;
+                    const value = context.dataset.data[index];
+                    if (value && value.y > threshold) {
+                        return '#ef4444'; // Warning Red
+                    }
+                    return colors.border;
+                },
+                pointBorderColor: function(context) {
+                    const index = context.dataIndex;
+                    const value = context.dataset.data[index];
+                    if (value && value.y > threshold) {
+                        return '#ffffff'; // White border for red dots
+                    }
+                    return colors.border;
+                },
+                pointRadius: function(context) {
+                    const index = context.dataIndex;
+                    const value = context.dataset.data[index];
+                    if (value && value.y > threshold) {
+                        return 5; // Larger warning dots
+                    }
+                    return 2;
+                },
+                pointHoverRadius: 7,
                 fill: true,
                 tension: 0.4 // Smooth curves
             });
@@ -153,10 +215,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Function to update the recent logs table
     function updateTable(data) {
+        if (!logsTableBody) return;
         logsTableBody.innerHTML = '';
         
-        // Show only the latest 10 items in the table
-        // Since data is sorted chronologically for the chart, the latest are at the end
+        // Show only the latest 15 items in the table
         const recentData = [...data].reverse().slice(0, 15);
         
         recentData.forEach(item => {
@@ -168,21 +230,39 @@ document.addEventListener('DOMContentLoaded', function() {
                 colorDot = deviceColors[item.device_name].border;
             }
             
+            // Check if value exceeds threshold
+            const threshold = deviceThresholds[item.device_name] || 999.0;
+            const isExceeded = item.power_consumption > threshold;
+            
             const tr = document.createElement('tr');
+            if (isExceeded) {
+                tr.style.backgroundColor = 'rgba(239, 68, 68, 0.05)';
+            }
+            
+            const badgeHtml = isExceeded 
+                ? `<span class="badge bg-danger ms-2"><i class="fa-solid fa-triangle-exclamation"></i> 高耗電</span>` 
+                : '';
+                
+            const usageClass = isExceeded ? 'text-danger fw-bold' : 'fw-bold';
+            
             tr.innerHTML = `
                 <td class="text-muted"><small>${timeStr}</small></td>
                 <td>
                     <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background-color:${colorDot}; margin-right:6px;"></span>
                     ${item.device_name.split(' ')[0]} 
                 </td>
-                <td class="text-end fw-bold">${item.power_consumption.toFixed(2)}</td>
+                <td class="text-end ${usageClass}">
+                    ${item.power_consumption.toFixed(2)} ${badgeHtml}
+                </td>
             `;
             logsTableBody.appendChild(tr);
         });
     }
 
     // Event Listeners
-    refreshBtn.addEventListener('click', fetchData);
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', fetchData);
+    }
 
     // Initial fetch
     fetchData();

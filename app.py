@@ -1,4 +1,5 @@
 import sqlite3
+import datetime
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -7,7 +8,7 @@ app.secret_key = 'secret-energy-key'
 DB_FILE = 'database.db'
 
 def init_db():
-    """Initialize the SQLite database, create tables, and populate default users."""
+    """Initialize the SQLite database, create tables, and populate default users/tickets."""
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     
@@ -31,6 +32,20 @@ def init_db():
         )
     ''')
     
+    # Create repair_tickets table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS repair_tickets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            device_name TEXT NOT NULL,
+            description TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT '待處理',
+            reported_by TEXT NOT NULL,
+            handler TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            resolved_at DATETIME
+        )
+    ''')
+    
     # Check if users table is empty to populate defaults
     cursor.execute('SELECT COUNT(*) FROM users')
     if cursor.fetchone()[0] == 0:
@@ -41,6 +56,18 @@ def init_db():
         cursor.executemany(
             'INSERT INTO users (username, password, role) VALUES (?, ?, ?)',
             default_users
+        )
+        
+    # Check if repair_tickets is empty to populate some initial test history
+    cursor.execute('SELECT COUNT(*) FROM repair_tickets')
+    if cursor.fetchone()[0] == 0:
+        default_tickets = [
+            ('Device-A (Chiller)', '冷凝器水溫偏高，高溫警報器異常觸發', '已結案', 'student@school.edu', 'admin@school.edu', '2026-05-21 10:00:00', '2026-05-21 12:00:00'),
+            ('Device-C (HVAC)', '出風口傳出異音，且出風量異常偏低', '待處理', 'student@school.edu', None, '2026-05-21 14:30:00', None)
+        ]
+        cursor.executemany(
+            'INSERT INTO repair_tickets (device_name, description, status, reported_by, handler, created_at, resolved_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            default_tickets
         )
     
     conn.commit()
@@ -96,6 +123,94 @@ def logout():
     """Handle user logout."""
     session.clear()
     return redirect(url_for('login'))
+
+# ----------------- 報修系統路由 -----------------
+
+@app.route('/repair')
+def repair():
+    """Serve the repair and maintenance page."""
+    if not is_logged_in():
+        return redirect(url_for('login'))
+        
+    conn = get_db_connection()
+    # Fetch active tickets (Pending or Processing)
+    active_tickets = conn.execute(
+        "SELECT * FROM repair_tickets WHERE status != '已結案' ORDER BY created_at DESC"
+    ).fetchall()
+    
+    # Fetch resolved history
+    resolved_tickets = conn.execute(
+        "SELECT * FROM repair_tickets WHERE status = '已結案' ORDER BY resolved_at DESC"
+    ).fetchall()
+    conn.close()
+    
+    # Available devices for reporting
+    devices = ["Device-A (Chiller)", "Device-B (Air Compressor)", "Device-C (HVAC)"]
+    
+    return render_template(
+        'repair.html', 
+        username=session['username'], 
+        role=session['role'],
+        active_tickets=active_tickets,
+        resolved_tickets=resolved_tickets,
+        devices=devices
+    )
+
+@app.route('/api/repair', methods=['POST'])
+def create_ticket():
+    """Submit a new repair ticket (Anyone logged in)."""
+    if not is_logged_in():
+        return jsonify({'error': 'Unauthorized'}), 401
+        
+    device_name = request.form.get('device_name')
+    description = request.form.get('description')
+    
+    if not device_name or not description:
+        return jsonify({'error': '請選擇設備並填寫描述'}), 400
+        
+    conn = get_db_connection()
+    conn.execute(
+        'INSERT INTO repair_tickets (device_name, description, reported_by, status) VALUES (?, ?, ?, ?)',
+        (device_name, description, session['username'], '待處理')
+    )
+    conn.commit()
+    conn.close()
+    
+    return redirect(url_for('repair'))
+
+@app.route('/api/repair/<int:ticket_id>/status', methods=['POST'])
+def update_ticket_status(ticket_id):
+    """Update ticket status (Admin only)."""
+    if not is_logged_in():
+        return jsonify({'error': 'Unauthorized'}), 401
+        
+    if session.get('role') != 'admin':
+        return jsonify({'error': '只有管理員擁有此操作權限'}), 403
+        
+    new_status = request.form.get('status')
+    if new_status not in ['維修中', '已結案']:
+        return jsonify({'error': '無效的狀態變更'}), 400
+        
+    conn = get_db_connection()
+    now_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    
+    if new_status == '維修中':
+        conn.execute(
+            'UPDATE repair_tickets SET status = ?, handler = ? WHERE id = ?',
+            (new_status, session['username'], ticket_id)
+        )
+    elif new_status == '已結案':
+        conn.execute(
+            'UPDATE repair_tickets SET status = ?, resolved_at = ? WHERE id = ?',
+            (new_status, now_str, ticket_id)
+        )
+        
+    conn.commit()
+    conn.close()
+    
+    return redirect(url_for('repair'))
+
+# ----------------- 能耗數據 API -----------------
 
 @app.route('/api/data', methods=['POST'])
 def add_data():

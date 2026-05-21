@@ -17,17 +17,33 @@
     <!-- Navbar -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark-custom">
         <div class="container-fluid">
-            <a class="navbar-brand fw-bold" href="#">
+            <a class="navbar-brand fw-bold" href="/">
                 <i class="fa-solid fa-bolt text-warning me-2"></i> Smart Energy Dashboard
             </a>
-            <div class="d-flex align-items-center">
-                <span class="navbar-text text-light me-3">
-                    <span id="live-status" class="badge bg-success shadow-sm pulse-badge me-2">● Live System</span>
-                    <i class="fa-regular fa-user text-muted me-1"></i> 
-                    <span class="text-white fw-semibold">{{ username }}</span> 
-                    <span class="badge bg-secondary text-dark fw-bold ms-1" style="font-size: 0.75rem; background-color: #e2e8f0 !important;">{{ '管理員' if role == 'admin' else '學生' }}</span>
-                </span>
-                <a href="/logout" class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-right-from-bracket"></i> 登出</a>
+            
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <div class="collapse navbar-collapse justify-content-between" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/"><i class="fa-solid fa-chart-line me-1"></i> 即時監控</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/repair"><i class="fa-solid fa-tools me-1"></i> 設備報修與履歷</a>
+                    </li>
+                </ul>
+                
+                <div class="d-flex align-items-center">
+                    <span class="navbar-text text-light me-3">
+                        <span id="live-status" class="badge bg-success shadow-sm pulse-badge me-2">● Live System</span>
+                        <i class="fa-regular fa-user text-muted me-1"></i> 
+                        <span class="text-white fw-semibold">{{ username }}</span> 
+                        <span class="badge bg-secondary text-dark fw-bold ms-1" style="font-size: 0.75rem; background-color: #e2e8f0 !important;">{{ '管理員' if role == 'admin' else '學生' }}</span>
+                    </span>
+                    <a href="/logout" class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-right-from-bracket"></i> 登出</a>
+                </div>
             </div>
         </div>
     </nav>
