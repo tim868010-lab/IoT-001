@@ -20,9 +20,15 @@
             <a class="navbar-brand fw-bold" href="#">
                 <i class="fa-solid fa-bolt text-warning me-2"></i> Smart Energy Dashboard
             </a>
-            <span class="navbar-text text-light">
-                <span id="live-status" class="badge bg-success shadow-sm pulse-badge">● Live System</span>
-            </span>
+            <div class="d-flex align-items-center">
+                <span class="navbar-text text-light me-3">
+                    <span id="live-status" class="badge bg-success shadow-sm pulse-badge me-2">● Live System</span>
+                    <i class="fa-regular fa-user text-muted me-1"></i> 
+                    <span class="text-white fw-semibold">{{ username }}</span> 
+                    <span class="badge bg-secondary text-dark fw-bold ms-1" style="font-size: 0.75rem; background-color: #e2e8f0 !important;">{{ '管理員' if role == 'admin' else '學生' }}</span>
+                </span>
+                <a href="/logout" class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-right-from-bracket"></i> 登出</a>
+            </div>
         </div>
     </nav>
 
