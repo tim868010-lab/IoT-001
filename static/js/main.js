@@ -259,14 +259,77 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Function to fetch system status and update Edge AI Health on homepage
+    async function fetchSystemStatus() {
+        try {
+            const response = await fetch('/api/system/status');
+            if (response.status === 401) return;
+            const data = await response.json();
+            
+            const idMap = {
+                'Device-A (Chiller)': 'chiller',
+                'Device-B (Air Compressor)': 'compressor',
+                'Device-C (HVAC)': 'hvac'
+            };
+            
+            let hasAnomaly = false;
+            
+            data.forEach(device => {
+                const key = idMap[device.device_name];
+                if (!key) return;
+                
+                const score = device.health_score;
+                if (score < 80) {
+                    hasAnomaly = true;
+                }
+                
+                const scoreEl = document.getElementById(`index-${key}-health`);
+                const barEl = document.getElementById(`index-${key}-bar`);
+                
+                if (scoreEl) scoreEl.textContent = `${score}%`;
+                if (barEl) {
+                    barEl.style.width = `${score}%`;
+                    
+                    // Reset class names
+                    barEl.className = 'progress-bar';
+                    if (score >= 90) {
+                        barEl.classList.add('bg-success');
+                    } else if (score >= 80) {
+                        barEl.classList.add('bg-info');
+                    } else {
+                        barEl.classList.add('bg-danger');
+                    }
+                }
+            });
+            
+            const bannerEl = document.getElementById('ai-anomaly-banner');
+            if (bannerEl) {
+                if (hasAnomaly) {
+                    bannerEl.classList.remove('d-none');
+                } else {
+                    bannerEl.classList.add('d-none');
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching system status on index:', error);
+        }
+    }
+
     // Event Listeners
     if (refreshBtn) {
-        refreshBtn.addEventListener('click', fetchData);
+        refreshBtn.addEventListener('click', () => {
+            fetchData();
+            fetchSystemStatus();
+        });
     }
 
     // Initial fetch
     fetchData();
+    fetchSystemStatus();
 
     // Setup polling every 3 seconds
-    setInterval(fetchData, 3000);
+    setInterval(() => {
+        fetchData();
+        fetchSystemStatus();
+    }, 3000);
 });

@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Energy System - Edge & System Management</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .progress-bar-custom {
+            height: 10px;
+            border-radius: 5px;
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+        .progress-bar-fill {
+            height: 100%;
+            border-radius: 5px;
+            transition: width 0.3s ease;
+        }
+        /* Matter Topology Styling */
+        .matter-network-card {
+            background: rgba(15, 23, 42, 0.4);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            padding: 1.5rem;
+        }
+        .node-circle {
+            transition: all 0.3s ease;
+        }
+        .node-link {
+            stroke-dasharray: 5, 5;
+            transition: all 0.3s ease;
+        }
+        .node-link.paired {
+            stroke-dasharray: none;
+            stroke: #10b981;
+        }
+        .node-circle.paired {
+            fill: #10b981;
+            filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.6));
+        }
+        .node-circle.unpaired {
+            fill: #ef4444;
+            filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.4));
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark-custom">
+        <div class="container-fluid">
+            <a class="navbar-brand fw-bold" href="/">
+                <i class="fa-solid fa-bolt text-warning me-2"></i> Smart Energy Dashboard
+            </a>
+            
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <div class="collapse navbar-collapse justify-content-between" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/"><i class="fa-solid fa-chart-line me-1"></i> 即時監控</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/repair"><i class="fa-solid fa-tools me-1"></i> 設備報修與履歷</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/system"><i class="fa-solid fa-microchip me-1"></i> 邊緣與系統管理</a>
+                    </li>
+                </ul>
+                
+                <div class="d-flex align-items-center">
+                    <span class="navbar-text text-light me-3">
+                        <i class="fa-regular fa-user text-muted me-1"></i> 
+                        <span class="text-white fw-semibold">{{ username }}</span> 
+                        <span class="badge bg-secondary text-dark fw-bold ms-1" style="font-size: 0.75rem; background-color: #e2e8f0 !important;">{{ '管理員' if role == 'admin' else '學生' }}</span>
+                    </span>
+                    <a href="/logout" class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-right-from-bracket"></i> 登出</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="container-fluid mt-4">
+        <div class="row mb-4">
+            <div class="col-12">
+                <h2 class="fw-bold mb-0 text-white">邊緣運算與系統管理 (Edge & System Management)</h2>
+                <p class="text-muted">整合 Edge AI 預測性維護健康指標、OTA 遠端韌體升級與 Matter 節點拓撲。</p>
+            </div>
+        </div>
+
+        <!-- Row 1: Edge AI Predictive Maintenance -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-0 glass-card">
+                    <div class="card-body">
+                        <h5 class="card-title fw-bold mb-4 text-white">
+                            <i class="fa-solid fa-brain text-purple me-2" style="color: #a855f7;"></i> Edge AI 預測性維護儀表板
+                        </h5>
+                        
+                        <div class="row" id="ai-health-cards">
+                            <!-- Populated dynamically by JS -->
+                            <div class="col-md-4 mb-3">
+                                <div class="card bg-dark border-0 p-3" style="background-color: rgba(15, 23, 42, 0.4) !important;">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <h6 class="fw-bold mb-0 text-white">Chiller 冰水主機</h6>
+                                        <span class="badge bg-success" id="chiller-health-badge">Loading...</span>
+                                    </div>
+                                    <h2 class="fw-bold my-3 text-white" id="chiller-health-score">--%</h2>
+                                    <div class="progress-bar-custom mb-3">
+                                        <div class="progress-bar-fill bg-success" id="chiller-health-bar" style="width: 0%;"></div>
+                                    </div>
+                                    <p class="small text-muted mb-0" id="chiller-status-desc">分析中...</p>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4 mb-3">
+                                <div class="card bg-dark border-0 p-3" style="background-color: rgba(15, 23, 42, 0.4) !important;">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <h6 class="fw-bold mb-0 text-white">Compressor 空壓機</h6>
+                                        <span class="badge bg-success" id="compressor-health-badge">Loading...</span>
+                                    </div>
+                                    <h2 class="fw-bold my-3 text-white" id="compressor-health-score">--%</h2>
+                                    <div class="progress-bar-custom mb-3">
+                                        <div class="progress-bar-fill bg-success" id="compressor-health-bar" style="width: 0%;"></div>
+                                    </div>
+                                    <p class="small text-muted mb-0" id="compressor-status-desc">分析中...</p>
+                                </div>
+                            </div>
+
+                            <div class="col-md-4 mb-3">
+                                <div class="card bg-dark border-0 p-3" style="background-color: rgba(15, 23, 42, 0.4) !important;">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <h6 class="fw-bold mb-0 text-white">HVAC 空調箱</h6>
+                                        <span class="badge bg-success" id="hvac-health-badge">Loading...</span>
+                                    </div>
+                                    <h2 class="fw-bold my-3 text-white" id="hvac-health-score">--%</h2>
+                                    <div class="progress-bar-custom mb-3">
+                                        <div class="progress-bar-fill bg-success" id="hvac-health-bar" style="width: 0%;"></div>
+                                    </div>
+                                    <p class="small text-muted mb-0" id="hvac-status-desc">分析中...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 2: OTA and Matter -->
+        <div class="row">
+            <!-- OTA Update Console -->
+            <div class="col-xl-6 mb-4">
+                <div class="card shadow-sm border-0 h-100 glass-card">
+                    <div class="card-body">
+                        <h5 class="card-title fw-bold mb-4 text-white"><i class="fa-solid fa-cloud-arrow-up text-primary me-2"></i> OTA 遠端韌體升級主控台</h5>
+                        <div class="table-responsive">
+                            <table class="table table-dark table-borderless align-middle text-white mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>設備</th>
+                                        <th>當前版本</th>
+                                        <th>更新狀態</th>
+                                        <th class="text-end">動作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ota-table-body">
+                                    <!-- Populated by JS -->
+                                    <tr id="ota-row-chiller">
+                                        <td class="fw-semibold">Device-A (Chiller)</td>
+                                        <td id="chiller-version">--</td>
+                                        <td>
+                                            <div class="progress-bar-custom d-none" id="chiller-ota-progress-container" style="width: 120px;">
+                                                <div class="progress-bar-fill bg-primary" id="chiller-ota-progress" style="width: 0%;"></div>
+                                            </div>
+                                            <span class="small text-muted" id="chiller-ota-status">運行最新版</span>
+                                        </td>
+                                        <td class="text-end">
+                                            <button class="btn btn-xs btn-outline-primary btn-ota" data-device="Device-A (Chiller)">
+                                                <i class="fa-solid fa-rotate"></i> 更新
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    <tr id="ota-row-compressor">
+                                        <td class="fw-semibold">Device-B (Air Compressor)</td>
+                                        <td id="compressor-version">--</td>
+                                        <td>
+                                            <div class="progress-bar-custom d-none" id="compressor-ota-progress-container" style="width: 120px;">
+                                                <div class="progress-bar-fill bg-primary" id="compressor-ota-progress" style="width: 0%;"></div>
+                                            </div>
+                                            <span class="small text-muted" id="compressor-ota-status">運行最新版</span>
+                                        </td>
+                                        <td class="text-end">
+                                            <button class="btn btn-xs btn-outline-primary btn-ota" data-device="Device-B (Air Compressor)">
+                                                <i class="fa-solid fa-rotate"></i> 更新
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    <tr id="ota-row-hvac">
+                                        <td class="fw-semibold">Device-C (HVAC)</td>
+                                        <td id="hvac-version">--</td>
+                                        <td>
+                                            <div class="progress-bar-custom d-none" id="hvac-ota-progress-container" style="width: 120px;">
+                                                <div class="progress-bar-fill bg-primary" id="hvac-ota-progress" style="width: 0%;"></div>
+                                            </div>
+                                            <span class="small text-muted" id="hvac-ota-status">運行最新版</span>
+                                        </td>
+                                        <td class="text-end">
+                                            <button class="btn btn-xs btn-outline-primary btn-ota" data-device="Device-C (HVAC)">
+                                                <i class="fa-solid fa-rotate"></i> 更新
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Matter Smart Node Dashboard -->
+            <div class="col-xl-6 mb-4">
+                <div class="card shadow-sm border-0 h-100 glass-card">
+                    <div class="card-body d-flex flex-column">
+                        <h5 class="card-title fw-bold mb-4 text-white"><i class="fa-solid fa-circle-nodes text-success me-2"></i> Matter 節點與網路拓撲</h5>
+                        
+                        <div class="row align-items-center flex-grow-1">
+                            <!-- Topology Diagram Column -->
+                            <div class="col-md-7 text-center">
+                                <div class="matter-network-card">
+                                    <svg viewBox="0 0 320 220" width="100%" height="200">
+                                        <!-- Connections -->
+                                        <!-- Root to Chiller -->
+                                        <line x1="160" y1="110" x2="60" y2="50" stroke="#475569" stroke-width="2" id="link-chiller" class="node-link" />
+                                        <!-- Root to Compressor -->
+                                        <line x1="160" y1="110" x2="260" y2="50" stroke="#475569" stroke-width="2" id="link-compressor" class="node-link" />
+                                        <!-- Root to HVAC -->
+                                        <line x1="160" y1="110" x2="160" y2="180" stroke="#475569" stroke-width="2" id="link-hvac" class="node-link" />
+                                        
+                                        <!-- Root Node (Matter Fabric Gateway) -->
+                                        <circle cx="160" cy="110" r="16" fill="#6366f1" filter="drop-shadow(0 0 6px rgba(99, 102, 241, 0.8))" />
+                                        <text x="160" y="114" fill="#ffffff" font-size="9" font-weight="bold" text-anchor="middle">GW</text>
+                                        <text x="160" y="135" fill="#a5b4fc" font-size="9" font-weight="600" text-anchor="middle">Fabric 0x22F</text>
+                                        
+                                        <!-- Device A: Chiller -->
+                                        <circle cx="60" cy="50" r="12" fill="#475569" id="node-chiller" class="node-circle" />
+                                        <text x="60" y="53" fill="#ffffff" font-size="8" font-weight="bold" text-anchor="middle">A</text>
+                                        <text x="60" y="32" fill="#94a3b8" font-size="8" font-weight="600" text-anchor="middle">Chiller</text>
+                                        
+                                        <!-- Device B: Compressor -->
+                                        <circle cx="260" cy="50" r="12" fill="#475569" id="node-compressor" class="node-circle" />
+                                        <text x="260" y="53" fill="#ffffff" font-size="8" font-weight="bold" text-anchor="middle">B</text>
+                                        <text x="260" y="32" fill="#94a3b8" font-size="8" font-weight="600" text-anchor="middle">Compressor</text>
+                                        
+                                        <!-- Device C: HVAC -->
+                                        <circle cx="160" cy="180" r="12" fill="#475569" id="node-hvac" class="node-circle" />
+                                        <text x="160" y="183" fill="#ffffff" font-size="8" font-weight="bold" text-anchor="middle">C</text>
+                                        <text x="160" y="202" fill="#94a3b8" font-size="8" font-weight="600" text-anchor="middle">HVAC</text>
+                                    </svg>
+                                </div>
+                            </div>
+                            
+                            <!-- Control Panel Column -->
+                            <div class="col-md-5">
+                                <h6 class="fw-bold text-muted small mb-3">Matter 節點配對與配網</h6>
+                                <div class="d-grid gap-2">
+                                    <button class="btn btn-sm btn-outline-light d-flex justify-content-between align-items-center btn-matter" data-device="Device-A (Chiller)" id="btn-matter-chiller">
+                                        <span>Device-A (Chiller)</span>
+                                        <span class="badge bg-secondary" id="badge-matter-chiller">Loading...</span>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-light d-flex justify-content-between align-items-center btn-matter" data-device="Device-B (Air Compressor)" id="btn-matter-compressor">
+                                        <span>Device-B (Compressor)</span>
+                                        <span class="badge bg-secondary" id="badge-matter-compressor">Loading...</span>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-light d-flex justify-content-between align-items-center btn-matter" data-device="Device-C (HVAC)" id="btn-matter-hvac">
+                                        <span>Device-C (HVAC)</span>
+                                        <span class="badge bg-secondary" id="badge-matter-hvac">Loading...</span>
+                                    </button>
+                                </div>
+                                <div class="mt-3 bg-dark p-2 rounded text-muted" style="font-size: 0.75rem; background-color: rgba(15, 23, 42, 0.3) !important;">
+                                    <i class="fa-solid fa-circle-info text-info me-1"></i> Matter 節點採用 Thread / Wi-Fi 混合架構，支援多 Fabric 連接。點擊上方按鈕可以手動配對/退出 Matter Fabric。
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/system.js') }}"></script>
+</body>
+</html>
