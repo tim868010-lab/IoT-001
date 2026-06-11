@@ -272,31 +272,33 @@ def add_data():
     )
     
     # --- Edge AI 健康度衰減與自動故障報警邏輯 ---
-    threshold = DEVICE_THRESHOLDS.get(device_name, 999.0)
-    if power_consumption > threshold:
-        # 衰減健康度 1-3%
-        decay = random.randint(1, 3)
-        cursor.execute('SELECT health_score FROM device_status WHERE device_name = ?', (device_name,))
-        row = cursor.fetchone()
-        if row:
-            current_health = row[0]
+    cursor.execute('SELECT health_score FROM device_status WHERE device_name = ?', (device_name,))
+    row = cursor.fetchone()
+    if row:
+        current_health = row[0]
+        new_health = current_health
+        
+        threshold = DEVICE_THRESHOLDS.get(device_name, 999.0)
+        if power_consumption > threshold:
+            # 衰減健康度 1-3%
+            decay = random.randint(1, 3)
             new_health = max(0, current_health - decay)
             cursor.execute('UPDATE device_status SET health_score = ? WHERE device_name = ?', (new_health, device_name))
-            
-            # 如果健康度低於 80%，且該設備目前沒有未結案的 Edge AI 報修單，則自動派單
-            if new_health < 80:
+        
+        # 只要健康度低於 80%，且該設備目前沒有未結案的 AI 系統報修單，就自動派單
+        if new_health < 80:
+            cursor.execute(
+                "SELECT COUNT(*) FROM repair_tickets WHERE device_name = ? AND status != '已結案' AND reported_by = 'Edge_AI_System'",
+                (device_name,)
+            )
+            if cursor.fetchone()[0] == 0:
+                now_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                desc = f"⚠️ [AI 系統預測預警] 設備能耗持續超標，健康度已降至 {new_health}%，檢測到潛在內部部件磨損，請儘速進行排程維護。"
                 cursor.execute(
-                    "SELECT COUNT(*) FROM repair_tickets WHERE device_name = ? AND status != '已結案' AND reported_by = 'Edge_AI_System'",
-                    (device_name,)
+                    'INSERT INTO repair_tickets (device_name, description, reported_by, status, created_at) VALUES (?, ?, ?, ?, ?)',
+                    (device_name, desc, 'Edge_AI_System', '待處理', now_str)
                 )
-                if cursor.fetchone()[0] == 0:
-                    now_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                    desc = f"⚠️ [Edge AI 預測預警] 設備能耗持續超標，健康度已降至 {new_health}%，檢測到潛在內部部件磨損，請儘速進行排程維護。"
-                    cursor.execute(
-                        'INSERT INTO repair_tickets (device_name, description, reported_by, status, created_at) VALUES (?, ?, ?, ?, ?)',
-                        (device_name, desc, 'Edge_AI_System', '待處理', now_str)
-                    )
-                    
+                
     conn.commit()
     conn.close()
     

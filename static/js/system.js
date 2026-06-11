@@ -40,12 +40,12 @@ document.addEventListener('DOMContentLoaded', function() {
                         barEl.classList.add('bg-success');
                         badgeEl.className = 'badge bg-success';
                         badgeEl.textContent = '🟢 運行良好';
-                        descEl.textContent = 'Edge AI 分析：運轉效率最佳，無磨損微兆。';
+                        descEl.textContent = 'AI 系統分析：運轉效率最佳，無磨損徵兆。';
                     } else if (score >= 80) {
                         barEl.classList.add('bg-info');
                         badgeEl.className = 'badge bg-info';
                         badgeEl.textContent = '🔵 狀態正常';
-                        descEl.textContent = 'Edge AI 分析：有微弱噪音，持續監控中。';
+                        descEl.textContent = 'AI 系統分析：有微弱噪音，持續監控中。';
                     } else {
                         barEl.classList.add('bg-danger');
                         badgeEl.className = 'badge bg-danger';
